@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Lurker</title>
+<style>
+:root{--bg:#eef1f4;--card:#fff;--ink:#14202b;--mute:#5d6b78;--line:#d9e0e6;--acc:#0f766e;--on:#fff;--chip:#e1e8ee;
+--r0:#0f766e;--r1:#b45309;--r2:#6d28d9;--r3:#be123c;--r4:#1d4ed8;--r5:#4d7c0f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0d1319;--card:#151d25;--ink:#e6edf3;--mute:#92a1af;--line:#26323d;--acc:#5eead4;--on:#06201d;--chip:#1f2a34;
+--r0:#5eead4;--r1:#fbbf24;--r2:#c4b5fd;--r3:#fda4af;--r4:#93c5fd;--r5:#bef264}}
+:root[data-theme="dark"]{--bg:#0d1319;--card:#151d25;--ink:#e6edf3;--mute:#92a1af;--line:#26323d;--acc:#5eead4;--on:#06201d;--chip:#1f2a34;
+--r0:#5eead4;--r1:#fbbf24;--r2:#c4b5fd;--r3:#fda4af;--r4:#93c5fd;--r5:#bef264}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding-bottom:env(safe-area-inset-bottom)}
+body.lock{overflow:hidden}
+button,input,select{font:inherit;color:inherit}
+.wrap{max-width:680px;margin:0 auto}
+header{position:sticky;top:0;z-index:10;background:var(--bg);border-bottom:1px solid var(--line);padding:calc(8px + env(safe-area-inset-top)) 12px 8px}
+form,.row{display:flex;gap:8px}
+.row{margin-top:8px}
+.in{display:flex;align-items:center;flex:1;min-width:0;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:0 10px}
+.in b{color:var(--acc)}
+.in input{flex:1;min-width:0;border:0;outline:0;background:none;padding:11px 4px}
+.btn{min-height:44px;border:0;border-radius:10px;padding:0 14px;font-weight:650;background:var(--acc);color:var(--on)}
+.ghost{background:var(--chip);color:var(--ink)}
+select,.f input[type=text],.f input[type=number]{min-height:44px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:0 8px;min-width:0}
+.row select{flex:1}
+.f{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.f[hidden]{display:none}
+.f .full{grid-column:1/-1}
+.f label{display:flex;align-items:center;gap:8px;min-height:40px;color:var(--mute)}
+#chips{display:flex;gap:6px;overflow-x:auto;margin-top:8px;scrollbar-width:none}
+#chips:empty{display:none}
+#chips button{flex:none;border:0;border-radius:99px;background:var(--chip);padding:5px 12px;color:var(--ink)}
+#status{padding:8px 14px;color:var(--mute);font-size:13px}
+.card{display:flex;gap:12px;padding:13px 14px;background:var(--card);border-bottom:1px solid var(--line);cursor:pointer}
+.card:active{background:var(--chip)}
+.tx{flex:1;min-width:0}
+.meta{display:flex;flex-wrap:wrap;gap:2px 10px;font-size:12.5px;color:var(--mute)}
+.meta .s{color:var(--acc);font-weight:650}
+.card h3{margin:4px 0 7px;font:600 16.5px/1.3 Charter,"Iowan Old Style",Georgia,serif;overflow-wrap:anywhere}
+.th{width:78px;height:78px;border-radius:8px;object-fit:cover;background:var(--chip);flex:none}
+.tag{display:inline-block;background:var(--chip);border-radius:5px;padding:0 6px;font-size:12px;margin-right:4px}
+.nsfw{background:#c92a2a;color:#fff}
+.stat{font-size:13px;color:var(--mute);display:flex;gap:14px}
+.empty{padding:40px 20px;text-align:center;color:var(--mute)}
+.err{color:#c92a2a}
+#more{display:block;margin:14px auto 28px;min-width:60%}
+#post{position:fixed;inset:0;z-index:20;background:var(--bg);overflow-y:auto;-webkit-overflow-scrolling:touch}
+#post[hidden]{display:none}
+.bar{position:sticky;top:0;z-index:2;background:var(--bg);border-bottom:1px solid var(--line);padding:calc(8px + env(safe-area-inset-top)) 12px 8px;display:flex;align-items:center;gap:10px}
+.bar .t{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--mute);font-size:14px}
+.pb{padding:16px 14px 8px;background:var(--card);border-bottom:1px solid var(--line)}
+.pb h2{margin:6px 0 10px;font:700 22px/1.25 Charter,"Iowan Old Style",Georgia,serif;overflow-wrap:anywhere}
+.pb img{display:block;max-width:100%;border-radius:8px;margin:12px 0}
+.vid{position:relative;display:block}
+.vid span{position:absolute;left:10px;bottom:22px;background:rgba(0,0,0,.7);color:#fff;border-radius:6px;padding:4px 10px;font-size:14px}
+.lnk,.open{display:inline-block;margin:6px 10px 10px 0;padding:9px 14px;border-radius:10px;background:var(--chip);color:var(--ink);text-decoration:none;font-weight:600;font-size:14px}
+.stats{margin:12px 0 4px;color:var(--mute);font-size:13.5px}
+.ch{display:flex;align-items:center;justify-content:space-between;padding:12px 14px 8px;position:sticky}
+.md{font:17px/1.6 Charter,"Iowan Old Style",Georgia,serif;overflow-wrap:anywhere}
+.md p{margin:0 0 .8em}
+.md a{color:var(--acc)}
+.md blockquote{margin:0 0 .8em;padding-left:12px;border-left:3px solid var(--line);color:var(--mute)}
+.md pre{overflow-x:auto;background:var(--chip);padding:10px;border-radius:8px;font-size:14px}
+.md code{font-size:.9em;background:var(--chip);border-radius:4px;padding:0 3px}
+.md pre code{background:none;padding:0}
+.md table{display:block;overflow-x:auto;border-collapse:collapse}
+.md td,.md th{border:1px solid var(--line);padding:4px 8px}
+.md ul,.md ol{padding-left:22px}
+.md h1,.md h2,.md h3{font-size:1.1em}
+.md-spoiler-text{background:var(--ink);color:transparent;border-radius:3px;cursor:pointer}
+.md-spoiler-text.on{background:var(--chip);color:inherit}
+#cm{background:var(--card);padding-bottom:40px}
+.cm{--c:var(--r0);padding:10px 14px 0}
+.kids .cm{padding:10px 0 0 10px;margin-left:4px;border-left:3px solid var(--c)}
+.kids.deep .cm{margin-left:0;padding-left:0;border-left:0}
+.cmh{display:flex;gap:10px;font-size:13px;color:var(--mute);cursor:pointer;min-height:24px;align-items:center}
+.cmh b{color:var(--c);font-weight:650}
+.op{background:var(--c);color:var(--card);border-radius:4px;padding:0 5px;font-size:11.5px}
+.cb{margin-top:2px}
+.cb .md{font-size:16px;line-height:1.5}
+.cm.col>.cb,.cm.col>.kids{display:none}
+.cm.col>.cmh::after{content:"collapsed";margin-left:auto}
+.more{padding:8px 0 4px 10px;font-size:13px;color:var(--mute)}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <form id="go" autocomplete="off">
+    <label class="in"><b>r/</b><input id="sub" placeholder="subreddit" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="go"></label>
+    <button class="btn">Go</button>
+  </form>
+  <div class="row">
+    <select id="sort" aria-label="Sort"><option value="new">Newest</option><option value="hot">Hot</option><option value="rising">Rising</option><option value="top">Top</option></select>
+    <select id="t" aria-label="Time range" hidden><option value="day">Today</option><option value="week">Week</option><option value="month">Month</option><option value="year">Year</option><option value="all">All time</option></select>
+    <button class="btn ghost" id="ref" type="button" aria-label="Refresh">Refresh</button>
+    <button class="btn ghost" id="ft" type="button" aria-expanded="false">Filters</button>
+  </div>
+  <div class="f" id="f" hidden>
+    <input class="full" type="text" id="q" placeholder="Search titles and text in loaded posts">
+    <select id="fl" aria-label="Flair"><option value="">Any flair</option></select>
+    <select id="ty" aria-label="Post type"><option value="">Any type</option><option value="text">Text</option><option value="image">Image</option><option value="gallery">Gallery</option><option value="video">Video</option><option value="link">Link</option></select>
+    <input type="number" id="ms" placeholder="Min score" inputmode="numeric">
+    <label><input type="checkbox" id="nsfw" checked> Hide NSFW</label>
+    <button class="btn ghost full" id="rs" type="button">Clear filters</button>
+  </div>
+  <div id="chips"></div>
+</div></header>
+
+<div class="wrap">
+  <div id="status"></div>
+  <main id="list"></main>
+  <button class="btn ghost" id="more" hidden>Load more</button>
+</div>
+
+<section id="post" hidden>
+  <div class="bar"><button class="btn ghost" id="back">Back</button><div class="t" id="pt"></div></div>
+  <div class="wrap">
+    <div class="pb" id="pc"></div>
+    <div class="ch"><b>Comments</b>
+      <select id="cs" aria-label="Sort comments"><option value="top">Top</option><option value="new">Newest</option><option value="old">Oldest</option><option value="controversial">Controversial</option></select>
+    </div>
+    <div id="cm"></div>
+  </div>
+</section>
+
+<script>
+const $=s=>document.querySelector(s);
+const store={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v==null?d:v}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const num=v=>v>=1e4?Math.round(v/1e3)+"k":v>=1e3?(v/1e3).toFixed(1)+"k":v;
+const ago=t=>{const s=Date.now()/1e3-t;if(s<60)return"now";const m=s/60;if(m<60)return(m|0)+"m";const h=m/60;if(h<24)return(h|0)+"h";const d=h/24;if(d<30)return(d|0)+"d";return d<365?(d/30|0)+"mo":(d/365|0)+"y"};
+const SUGGEST=["AskReddit","worldnews","todayilearned","science","pics","technology"];
+let S={sub:"",posts:[],after:null,busy:false},cur=null;
+
+/* ---------- Reddit fetch ---------- */
+async function rj(url){
+  let r;
+  try{r=await fetch(url)}catch(e){throw new Error("Couldn’t reach Reddit. Check your connection. A page hosted online can’t call Reddit directly, so open the downloaded file instead.")}
+  if(r.status===404)throw new Error("That subreddit doesn’t exist.");
+  if(r.status===403)throw new Error("That subreddit is private, or Reddit blocked the request.");
+  if(r.status===429)throw new Error("Reddit is rate-limiting requests. Wait a minute, then refresh.");
+  if(!r.ok)throw new Error("Reddit returned an error ("+r.status+"). Try again shortly.");
+  try{return await r.json()}catch(e){throw new Error("Reddit sent an unexpected response. Try again.")}
+}
+
+/* ---------- Safe HTML from Reddit ---------- */
+const OK=new Set("P BR STRONG B EM I DEL SUP CODE PRE BLOCKQUOTE UL OL LI A H1 H2 H3 H4 H5 H6 HR TABLE THEAD TBODY TR TH TD SPAN DIV".split(" "));
+function clean(h){
+  if(!h)return"";
+  const doc=new DOMParser().parseFromString(h,"text/html");
+  (function walk(n){
+    for(const c of [...n.childNodes]){
+      if(c.nodeType===3)continue;
+      if(c.nodeType!==1){c.remove();continue}
+      if(/^(SCRIPT|STYLE|IFRAME|OBJECT|EMBED|TEMPLATE|NOSCRIPT)$/.test(c.tagName)){c.remove();continue}
+      if(!OK.has(c.tagName)){c.replaceWith(doc.createTextNode(c.textContent));continue}
+      const href=c.tagName==="A"?(c.getAttribute("href")||""):"";
+      const sp=c.tagName==="SPAN"&&c.classList.contains("md-spoiler-text");
+      [...c.attributes].forEach(a=>c.removeAttribute(a.name));
+      if(sp)c.className="md-spoiler-text";
+      if(c.tagName==="A"){
+        const u=href[0]==="/"?"https://www.reddit.com"+href:href;
+        if(!/^https?:\/\//i.test(u)){c.replaceWith(doc.createTextNode(c.textContent));continue}
+        c.href=u;c.target="_blank";c.rel="noopener noreferrer nofollow";
+      }
+      walk(c);
+    }
+  })(doc.body);
+  return doc.body.innerHTML;
+}
+
+/* ---------- Post helpers ---------- */
+function ptype(p){
+  const h=p.post_hint||"";
+  if(p.is_gallery)return"gallery";
+  if(p.is_video||/video/.test(h))return"video";
+  if(h==="image"||/\.(jpe?g|png|gif|webp)(\?|$)/i.test(p.url||""))return"image";
+  return p.is_self?"text":"link";
+}
+const prev=p=>{try{return p.preview.images[0].source.url}catch(e){return""}};
+const tags=p=>[p.over_18?'<span class="tag nsfw">NSFW</span>':"",p.spoiler?'<span class="tag">Spoiler</span>':"",p.link_flair_text?`<span class="tag">${esc(p.link_flair_text)}</span>`:"",p.stickied?'<span class="tag">Pinned</span>':""].join("");
+
+/* ---------- List ---------- */
+function filt(){return{q:$("#q").value.trim().toLowerCase(),fl:$("#fl").value,ty:$("#ty").value,ms:parseInt($("#ms").value,10),nsfw:$("#nsfw").checked}}
+function pass(p,f){
+  if(f.nsfw&&p.over_18)return false;
+  if(f.fl&&p.link_flair_text!==f.fl)return false;
+  if(f.ty&&ptype(p)!==f.ty)return false;
+  if(!isNaN(f.ms)&&p.score<f.ms)return false;
+  if(f.q&&!((p.title||"")+" "+(p.selftext||"")+" "+(p.author||"")).toLowerCase().includes(f.q))return false;
+  return true;
+}
+function card(p,i){
+  const th=p.thumbnail&&/^https?:/.test(p.thumbnail)?`<img class="th" src="${esc(p.thumbnail)}" loading="lazy" referrerpolicy="no-referrer" alt="">`:"";
+  return `<article class="card" data-i="${i}" tabindex="0">
+    <div class="tx"><div class="meta"><span class="s">r/${esc(p.subreddit)}</span><span>u/${esc(p.author)}</span><span>${ago(p.created_utc)}</span></div>
+    <h3>${esc(p.title)}</h3>
+    <div>${tags(p)}</div>
+    <div class="stat"><span>▲ ${num(p.score)}</span><span>${num(p.num_comments)} comments</span><span>${ptype(p)}</span></div></div>${th}</article>`;
+}
+function render(){
+  const f=filt(),vis=[];
+  S.posts.forEach((p,i)=>{if(pass(p,f))vis.push(card(p,i))});
+  $("#list").innerHTML=vis.length?vis.join(""):(S.posts.length?'<div class="empty">No loaded posts match your filters. Clear them or load more.</div>':$("#list").innerHTML);
+  $("#status").textContent=S.posts.length?`Showing ${vis.length} of ${S.posts.length} loaded posts`:"";
+  $("#more").hidden=!S.after;
+}
+function setFlairs(){
+  const sel=$("#fl"),keep=sel.value;
+  const fs=[...new Set(S.posts.map(p=>p.link_flair_text).filter(Boolean))].sort();
+  sel.innerHTML='<option value="">Any flair</option>'+fs.map(x=>`<option>${esc(x)}</option>`).join("");
+  sel.value=fs.includes(keep)?keep:"";
+}
+function welcome(){
+  $("#list").innerHTML='<div class="empty">Type a subreddit above to start reading.<div id="sug" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:14px"></div></div>';
+  $("#sug").innerHTML=SUGGEST.map(x=>`<button class="btn ghost" data-s="${x}">r/${x}</button>`).join("");
+}
+function remember(s){
+  const r=store.get("recent",[]).filter(x=>x.toLowerCase()!==s.toLowerCase());r.unshift(s);store.set("recent",r.slice(0,8));chips();
+}
+function chips(){$("#chips").innerHTML=store.get("recent",[]).map(x=>`<button data-s="${esc(x)}">r/${esc(x)}</button>`).join("")}
+
+async function load(reset){
+  if(S.busy||!S.sub)return;
+  S.busy=true;
+  const more=$("#more");more.disabled=true;more.textContent="Loading…";
+  if(reset){S.posts=[];S.after=null;$("#list").innerHTML='<div class="empty">Loading posts…</div>';$("#status").textContent="";more.hidden=true}
+  try{
+    const sort=$("#sort").value;
+    let u=`https://www.reddit.com/r/${S.sub}/${sort}.json?limit=50&raw_json=1`;
+    if(sort==="top")u+="&t="+$("#t").value;
+    if(S.after)u+="&after="+encodeURIComponent(S.after);
+    const j=await rj(u);
+    S.posts=S.posts.concat(j.data.children.filter(c=>c.kind==="t3").map(c=>c.data));
+    S.after=j.data.after;
+    if(!S.posts.length){$("#list").innerHTML='<div class="empty">No posts found in r/'+esc(S.sub)+'.</div>'}
+    else{remember(S.sub);setFlairs();render()}
+  }catch(e){
+    if(!S.posts.length)$("#list").innerHTML=`<div class="empty err">${esc(e.message)}</div>`;
+    else $("#status").textContent=e.message;
+  }finally{S.busy=false;more.disabled=false;more.textContent="Load more";more.hidden=!S.after}
+}
+function setSub(v){
+  const s=String(v).trim().replace(/^\/?r\//i,"").replace(/[^\w+]/g,"");
+  if(!s)return;
+  $("#sub").value=s;S.sub=s;store.set("sub",s);$("#sub").blur();load(true);
+}
+
+/* ---------- Post view ---------- */
+function media(p){
+  const t=ptype(p),pv=prev(p),im=s=>`<img src="${esc(s)}" loading="lazy" referrerpolicy="no-referrer" alt="">`;
+  if(t==="gallery"&&p.gallery_data&&p.media_metadata)
+    return p.gallery_data.items.slice(0,15).map(i=>{const m=p.media_metadata[i.media_id],s=m&&m.s&&(m.s.u||m.s.gif);return s?im(s):""}).join("");
+  if(t==="image")return im(pv||p.url);
+  if(t==="video"){const href="https://www.reddit.com"+p.permalink;return pv?`<a class="vid" href="${esc(href)}" target="_blank" rel="noopener">${im(pv)}<span>Watch on Reddit</span></a>`:""}
+  return pv?im(pv):"";
+}
+function postHTML(p){
+  const url=p.url_overridden_by_dest||p.url||"",ext=!p.is_self&&!p.is_gallery&&/^https?:/.test(url);
+  return `<div class="meta"><span class="s">r/${esc(p.subreddit)}</span><span>u/${esc(p.author)}</span><span>${ago(p.created_utc)}</span></div>
+  <h2>${esc(p.title)}</h2><div>${tags(p)}</div>${media(p)}
+  ${p.selftext_html?`<div class="md">${clean(p.selftext_html)}</div>`:""}
+  ${ext?`<a class="lnk" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Open ${esc(p.domain||"link")}</a>`:""}
+  <div class="stats">▲ ${num(p.score)} &nbsp; ${num(p.num_comments)} comments &nbsp; ${Math.round((p.upvote_ratio||0)*100)}% upvoted</div>
+  <a class="open" href="https://www.reddit.com${esc(p.permalink)}" target="_blank" rel="noopener">View on Reddit</a>`;
+}
+function openPost(p){
+  cur=p;$("#pt").textContent="r/"+p.subreddit;$("#pc").innerHTML=postHTML(p);
+  $("#post").hidden=false;$("#post").scrollTop=0;document.body.classList.add("lock");
+  location.hash="post";loadComments();
+}
+function closePost(){$("#post").hidden=true;document.body.classList.remove("lock")}
+function cm(c,d){
+  if(c.kind!=="t1"){const n=c.data&&c.data.count;return n?`<div class="more">${n} more ${n>1?"replies":"reply"} on Reddit</div>`:""}
+  const x=c.data,kids=x.replies&&x.replies.data?x.replies.data.children.map(k=>cm(k,d+1)).join(""):"";
+  return `<div class="cm" style="--c:var(--r${d%6})"><div class="cmh"><b>${esc(x.author)}</b>${x.is_submitter?'<span class="op">OP</span>':""}<span>▲ ${num(x.score)}</span><span>${ago(x.created_utc)}</span></div>
+  <div class="cb"><div class="md">${clean(x.body_html)}</div></div>${kids?`<div class="kids${d>=5?" deep":""}">${kids}</div>`:""}</div>`;
+}
+async function loadComments(){
+  const p=cur,box=$("#cm");
+  box.innerHTML='<div class="empty">Loading comments…</div>';
+  try{
+    const j=await rj(`https://www.reddit.com/r/${p.subreddit}/comments/${p.id}.json?raw_json=1&limit=300&sort=${$("#cs").value}`);
+    if(cur!==p)return;
+    const k=j[1].data.children;
+    box.innerHTML=k.length?k.map(c=>cm(c,0)).join(""):'<div class="empty">No comments yet.</div>';
+  }catch(e){if(cur===p)box.innerHTML=`<div class="empty err">${esc(e.message)}</div>`}
+}
+
+/* ---------- Wiring ---------- */
+$("#go").onsubmit=e=>{e.preventDefault();setSub($("#sub").value)};
+document.addEventListener("click",e=>{const b=e.target.closest("[data-s]");if(b)setSub(b.dataset.s)});
+$("#sort").onchange=()=>{$("#t").hidden=$("#sort").value!=="top";store.set("sort",$("#sort").value);load(true)};
+$("#t").onchange=()=>load(true);
+$("#ref").onclick=()=>load(true);
+$("#more").onclick=()=>load(false);
+$("#ft").onclick=()=>{const f=$("#f");f.hidden=!f.hidden;$("#ft").setAttribute("aria-expanded",!f.hidden)};
+["q","fl","ty","ms","nsfw"].forEach(id=>$("#"+id).addEventListener("input",render));
+$("#rs").onclick=()=>{$("#q").value="";$("#fl").value="";$("#ty").value="";$("#ms").value="";$("#nsfw").checked=true;render()};
+$("#list").onclick=e=>{const c=e.target.closest(".card");if(c)openPost(S.posts[+c.dataset.i])};
+$("#list").onkeydown=e=>{if(e.key==="Enter"){const c=e.target.closest(".card");if(c)openPost(S.posts[+c.dataset.i])}};
+$("#back").onclick=()=>history.back();
+$("#cs").onchange=loadComments;
+$("#cm").onclick=e=>{
+  const sp=e.target.closest(".md-spoiler-text");if(sp){sp.classList.toggle("on");return}
+  const h=e.target.closest(".cmh");if(h)h.parentNode.classList.toggle("col");
+};
+$("#pc").onclick=e=>{const sp=e.target.closest(".md-spoiler-text");if(sp)sp.classList.toggle("on")};
+addEventListener("hashchange",()=>{if(location.hash!=="#post")closePost()});
+
+/* ---------- Start ---------- */
+history.replaceState(null,"",location.pathname+location.search);
+$("#sort").value=store.get("sort","new");$("#t").hidden=$("#sort").value!=="top";
+chips();
+const last=store.get("sub","");
+if(last){$("#sub").value=last;S.sub=last;load(true)}else welcome();
+</script>
+</body>
+</html>
