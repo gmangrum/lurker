@@ -31,9 +31,9 @@ select,.f input[type=text],.f input[type=number]{min-height:44px;background:var(
 .f[hidden]{display:none}
 .f .full{grid-column:1/-1}
 .f label{display:flex;align-items:center;gap:8px;min-height:40px;color:var(--mute)}
-#chips{display:flex;gap:6px;overflow-x:auto;margin-top:8px;scrollbar-width:none}
-#chips:empty{display:none}
-#chips button{flex:none;border:0;border-radius:99px;background:var(--chip);padding:5px 12px;color:var(--ink)}
+#chips,#hits{display:flex;gap:6px;overflow-x:auto;margin-top:8px;scrollbar-width:none}
+#chips:empty,#hits:empty{display:none}
+#chips button,#hits button{flex:none;border:0;border-radius:99px;background:var(--chip);padding:5px 12px;color:var(--ink)}
 #status{padding:8px 14px;color:var(--mute);font-size:13px}
 .card{display:flex;gap:12px;padding:13px 14px;background:var(--card);border-bottom:1px solid var(--line);cursor:pointer}
 .card:active{background:var(--chip)}
@@ -100,13 +100,14 @@ select,.f input[type=text],.f input[type=number]{min-height:44px;background:var(
     <button class="btn ghost" id="ft" type="button" aria-expanded="false">Filters</button>
   </div>
   <div class="f" id="f" hidden>
-    <input class="full" type="text" id="q" placeholder="Search titles and text in loaded posts">
+    <input class="full" type="text" id="q" placeholder="Filter loaded posts, or search by keyword"><button class="btn full" id="qs" type="button">Search this subreddit’s archive</button>
     <select id="fl" aria-label="Flair"><option value="">Any flair</option></select>
     <select id="ty" aria-label="Post type"><option value="">Any type</option><option value="text">Text</option><option value="image">Image</option><option value="gallery">Gallery</option><option value="video">Video</option><option value="link">Link</option></select>
     <input type="number" id="ms" placeholder="Min score" inputmode="numeric">
     <label><input type="checkbox" id="nsfw" checked> Hide NSFW</label>
     <button class="btn ghost full" id="rs" type="button">Clear filters</button>
   </div>
+  <div id="hits"></div>
   <div id="chips"></div>
 </div></header>
 
@@ -145,7 +146,7 @@ function md(t){
 const num=v=>v>=1e4?Math.round(v/1e3)+"k":v>=1e3?(v/1e3).toFixed(1)+"k":v;
 const ago=t=>{const s=Date.now()/1e3-t;if(s<60)return"now";const m=s/60;if(m<60)return(m|0)+"m";const h=m/60;if(h<24)return(h|0)+"h";const d=h/24;if(d<30)return(d|0)+"d";return d<365?(d/30|0)+"mo":(d/365|0)+"y"};
 const SUGGEST=["AskReddit","worldnews","todayilearned","science","pics","technology"];
-let S={sub:"",posts:[],after:null,busy:false},cur=null;
+let S={sub:"",posts:[],after:null,busy:false,query:""},cur=null;
 
 /* ---------- Reddit fetch ---------- */
 async function rj(url){
@@ -200,7 +201,7 @@ function pass(p,f){
   if(f.fl&&p.link_flair_text!==f.fl)return false;
   if(f.ty&&ptype(p)!==f.ty)return false;
   if(!isNaN(f.ms)&&p.score<f.ms)return false;
-  if(f.q&&!((p.title||"")+" "+(p.selftext||"")+" "+(p.author||"")).toLowerCase().includes(f.q))return false;
+  if(f.q&&f.q!==S.query.toLowerCase()&&!((p.title||"")+" "+(p.selftext||"")+" "+(p.author||"")).toLowerCase().includes(f.q))return false;
   return true;
 }
 function card(p,i){
@@ -218,7 +219,7 @@ function render(){
   else if(o==="comments")idx.sort((a,b)=>S.posts[b].num_comments-S.posts[a].num_comments);
   idx.forEach(i=>{if(pass(S.posts[i],f))vis.push(card(S.posts[i],i))});
   $("#list").innerHTML=vis.length?vis.join(""):(S.posts.length?'<div class="empty">No loaded posts match your filters. Clear them or load more.</div>':$("#list").innerHTML);
-  $("#status").textContent=S.posts.length?`Showing ${vis.length} of ${S.posts.length} loaded posts`:"";
+  $("#status").textContent=S.posts.length?`Showing ${vis.length} of ${S.posts.length} loaded posts`+(S.query?` matching “${S.query}” in r/${S.sub}`:""):"";
   $("#more").hidden=!S.after;
 }
 function setFlairs(){
@@ -243,22 +244,24 @@ async function load(reset){
   if(reset){S.posts=[];S.after=null;$("#list").innerHTML='<div class="empty">Loading posts…</div>';$("#status").textContent="";more.hidden=true}
   try{
     let u=`https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=${S.sub}&sort=desc&limit=50`;
+    if(S.query)u+="&query="+encodeURIComponent(S.query);
     if(S.after)u+="&before="+encodeURIComponent(S.after);
     const j=await rj(u),a=(j.data||j).map(x=>x.data||x),seen=new Set(S.posts.map(x=>x.id)),n=a.filter(x=>!seen.has(x.id));
     S.posts=S.posts.concat(n);
     const last=a[a.length-1];
     S.after=n.length&&last?new Date(last.created_utc*1000).toISOString().replace(/\.\d+Z$/,"Z"):null;
-    if(!S.posts.length){$("#list").innerHTML='<div class="empty">No posts found in r/'+esc(S.sub)+'. It may not be in the archive.</div>'}
+    if(!S.posts.length){$("#list").innerHTML='<div class="empty">'+(S.query?'No posts in r/'+esc(S.sub)+' match “'+esc(S.query)+'”.':'No posts found in r/'+esc(S.sub)+'. It may not be in the archive.')+'</div>'}
     else{remember(S.sub);setFlairs();render()}
   }catch(e){
-    if(!S.posts.length)$("#list").innerHTML=`<div class="empty err">${esc(e.message)}</div>`;
-    else $("#status").textContent=e.message;
+    const msg=e.message+(S.query?" Keyword search can time out on very busy subreddits.":"");
+    if(!S.posts.length)$("#list").innerHTML=`<div class="empty err">${esc(msg)}</div>`;
+    else $("#status").textContent=msg;
   }finally{S.busy=false;more.disabled=false;more.textContent="Load more";more.hidden=!S.after}
 }
 function setSub(v){
   const s=String(v).trim().replace(/^\/?r\//i,"").replace(/[^\w]/g,"");
   if(!s)return;
-  $("#sub").value=s;S.sub=s;store.set("sub",s);$("#sub").blur();load(true);
+  $("#sub").value=s;S.sub=s;S.query="";$("#q").value="";$("#hits").innerHTML="";store.set("sub",s);$("#sub").blur();load(true);
 }
 
 /* ---------- Post view ---------- */
@@ -321,7 +324,7 @@ $("#ref").onclick=()=>load(true);
 $("#more").onclick=()=>load(false);
 $("#ft").onclick=()=>{const f=$("#f");f.hidden=!f.hidden;$("#ft").setAttribute("aria-expanded",!f.hidden)};
 ["q","fl","ty","ms","nsfw"].forEach(id=>$("#"+id).addEventListener("input",render));
-$("#rs").onclick=()=>{$("#q").value="";$("#fl").value="";$("#ty").value="";$("#ms").value="";$("#nsfw").checked=true;render()};
+$("#rs").onclick=()=>{const had=S.query;S.query="";$("#q").value="";$("#fl").value="";$("#ty").value="";$("#ms").value="";$("#nsfw").checked=true;had?load(true):render()};
 $("#list").onclick=e=>{const c=e.target.closest(".card");if(c)openPost(S.posts[+c.dataset.i])};
 $("#list").onkeydown=e=>{if(e.key==="Enter"){const c=e.target.closest(".card");if(c)openPost(S.posts[+c.dataset.i])}};
 $("#back").onclick=()=>history.back();
@@ -332,6 +335,23 @@ $("#cm").onclick=e=>{
 };
 $("#pc").onclick=e=>{const sp=e.target.closest(".md-spoiler-text");if(sp)sp.classList.toggle("on")};
 addEventListener("hashchange",()=>{if(location.hash!=="#post")closePost()});
+
+function archSearch(){
+  if(!S.sub){$("#status").textContent="Open a subreddit first. Keyword search works inside one subreddit at a time.";return}
+  S.query=$("#q").value.trim();load(true);
+}
+$("#qs").onclick=archSearch;
+$("#q").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();archSearch()}});
+const nm=v=>v.trim().replace(/^\/?r\//i,"").replace(/[^\w]/g,"");
+async function hits(v){
+  try{
+    const j=await rj(`https://arctic-shift.photon-reddit.com/api/subreddits/search?subreddit_prefix=${v}&limit=8&fields=display_name,subscribers`);
+    if(nm($("#sub").value)!==v)return;
+    $("#hits").innerHTML=(j.data||j).map(x=>x.display_name?`<button data-s="${esc(x.display_name)}">r/${esc(x.display_name)}${x.subscribers?" "+num(x.subscribers):""}</button>`:"").join("");
+  }catch(e){$("#hits").innerHTML=""}
+}
+let ht;
+$("#sub").addEventListener("input",()=>{clearTimeout(ht);const v=nm($("#sub").value);if(v.length<2){$("#hits").innerHTML="";return}ht=setTimeout(()=>hits(v),300)});
 
 /* ---------- Start ---------- */
 history.replaceState(null,"",location.pathname+location.search);
