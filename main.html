@@ -85,6 +85,7 @@ select,.f input[type=text],.f input[type=number]{min-height:44px;background:var(
 .cm.col>.cb,.cm.col>.kids{display:none}
 .cm.col>.cmh::after{content:"collapsed";margin-left:auto}
 .more{padding:8px 0 4px 10px;font-size:13px;color:var(--mute)}
+.note{text-align:center;color:var(--mute);font-size:12.5px;padding:0 20px 30px;margin:0}
 </style>
 </head>
 <body>
@@ -94,8 +95,7 @@ select,.f input[type=text],.f input[type=number]{min-height:44px;background:var(
     <button class="btn">Go</button>
   </form>
   <div class="row">
-    <select id="sort" aria-label="Sort"><option value="new">Newest</option><option value="hot">Hot</option><option value="rising">Rising</option><option value="top">Top</option></select>
-    <select id="t" aria-label="Time range" hidden><option value="day">Today</option><option value="week">Week</option><option value="month">Month</option><option value="year">Year</option><option value="all">All time</option></select>
+    <select id="sort" aria-label="Sort"><option value="new">Newest first</option><option value="score">Top score</option><option value="comments">Most comments</option></select>
     <button class="btn ghost" id="ref" type="button" aria-label="Refresh">Refresh</button>
     <button class="btn ghost" id="ft" type="button" aria-expanded="false">Filters</button>
   </div>
@@ -114,6 +114,7 @@ select,.f input[type=text],.f input[type=number]{min-height:44px;background:var(
   <div id="status"></div>
   <main id="list"></main>
   <button class="btn ghost" id="more" hidden>Load more</button>
+  <p class="note">Posts come from the Arctic Shift Reddit archive, so the newest posts and live scores can lag behind Reddit.</p>
 </div>
 
 <section id="post" hidden>
@@ -121,7 +122,7 @@ select,.f input[type=text],.f input[type=number]{min-height:44px;background:var(
   <div class="wrap">
     <div class="pb" id="pc"></div>
     <div class="ch"><b>Comments</b>
-      <select id="cs" aria-label="Sort comments"><option value="top">Top</option><option value="new">Newest</option><option value="old">Oldest</option><option value="controversial">Controversial</option></select>
+      <select id="cs" aria-label="Sort comments"><option value="top">Top</option><option value="new">Newest</option><option value="old">Oldest</option></select>
     </div>
     <div id="cm"></div>
   </div>
@@ -131,6 +132,16 @@ select,.f input[type=text],.f input[type=number]{min-height:44px;background:var(
 const $=s=>document.querySelector(s);
 const store={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v==null?d:v}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const dec=s=>String(s==null?"":s).replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&#x200B;/gi,"").replace(/&amp;/g,"&");
+function md(t){
+  t=dec(t).replace(/\r/g,"");if(!t.trim())return"";
+  const inl=s=>esc(s).replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g,'<a href="$2">$1</a>').replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g,'$1<a href="$2">$2</a>').replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/(^|[^*])\*([^*\n]+)\*/g,"$1<i>$2</i>").replace(/`([^`\n]+)`/g,"<code>$1</code>");
+  return clean(t.split(/\n{2,}/).map(b=>{
+    if(/^\s*>/.test(b))return"<blockquote>"+inl(b.replace(/^\s*>\s?/gm,"")).replace(/\n/g,"<br>")+"</blockquote>";
+    if(/^\s*([-*]|\d+\.)\s/.test(b))return"<ul>"+b.split("\n").map(l=>"<li>"+inl(l.replace(/^\s*([-*]|\d+\.)\s+/,""))+"</li>").join("")+"</ul>";
+    return"<p>"+inl(b).replace(/\n/g,"<br>")+"</p>";
+  }).join(""));
+}
 const num=v=>v>=1e4?Math.round(v/1e3)+"k":v>=1e3?(v/1e3).toFixed(1)+"k":v;
 const ago=t=>{const s=Date.now()/1e3-t;if(s<60)return"now";const m=s/60;if(m<60)return(m|0)+"m";const h=m/60;if(h<24)return(h|0)+"h";const d=h/24;if(d<30)return(d|0)+"d";return d<365?(d/30|0)+"mo":(d/365|0)+"y"};
 const SUGGEST=["AskReddit","worldnews","todayilearned","science","pics","technology"];
@@ -139,12 +150,10 @@ let S={sub:"",posts:[],after:null,busy:false},cur=null;
 /* ---------- Reddit fetch ---------- */
 async function rj(url){
   let r;
-  try{r=await fetch(url)}catch(e){throw new Error("Couldn’t reach Reddit. Check your connection. A page hosted online can’t call Reddit directly, so open the downloaded file instead.")}
-  if(r.status===404)throw new Error("That subreddit doesn’t exist.");
-  if(r.status===403)throw new Error("That subreddit is private, or Reddit blocked the request.");
-  if(r.status===429)throw new Error("Reddit is rate-limiting requests. Wait a minute, then refresh.");
-  if(!r.ok)throw new Error("Reddit returned an error ("+r.status+"). Try again shortly.");
-  try{return await r.json()}catch(e){throw new Error("Reddit sent an unexpected response. Try again.")}
+  try{r=await fetch(url)}catch(e){throw new Error("Couldn’t reach the Reddit archive. Check your connection and try again.")}
+  if(r.status===429)throw new Error("The archive is rate-limiting requests. Wait a minute, then refresh.");
+  if(!r.ok)throw new Error("The archive returned an error ("+r.status+"). Try again shortly.");
+  try{return await r.json()}catch(e){throw new Error("The archive sent an unexpected response. Try again.")}
 }
 
 /* ---------- Safe HTML from Reddit ---------- */
@@ -195,16 +204,19 @@ function pass(p,f){
   return true;
 }
 function card(p,i){
-  const th=p.thumbnail&&/^https?:/.test(p.thumbnail)?`<img class="th" src="${esc(p.thumbnail)}" loading="lazy" referrerpolicy="no-referrer" alt="">`:"";
+  const th=p.thumbnail&&/^https?:/.test(p.thumbnail)?`<img class="th" src="${esc(dec(p.thumbnail))}" loading="lazy" referrerpolicy="no-referrer" alt="">`:"";
   return `<article class="card" data-i="${i}" tabindex="0">
     <div class="tx"><div class="meta"><span class="s">r/${esc(p.subreddit)}</span><span>u/${esc(p.author)}</span><span>${ago(p.created_utc)}</span></div>
-    <h3>${esc(p.title)}</h3>
+    <h3>${esc(dec(p.title))}</h3>
     <div>${tags(p)}</div>
     <div class="stat"><span>▲ ${num(p.score)}</span><span>${num(p.num_comments)} comments</span><span>${ptype(p)}</span></div></div>${th}</article>`;
 }
 function render(){
   const f=filt(),vis=[];
-  S.posts.forEach((p,i)=>{if(pass(p,f))vis.push(card(p,i))});
+  const o=$("#sort").value,idx=S.posts.map((x,i)=>i);
+  if(o==="score")idx.sort((a,b)=>S.posts[b].score-S.posts[a].score);
+  else if(o==="comments")idx.sort((a,b)=>S.posts[b].num_comments-S.posts[a].num_comments);
+  idx.forEach(i=>{if(pass(S.posts[i],f))vis.push(card(S.posts[i],i))});
   $("#list").innerHTML=vis.length?vis.join(""):(S.posts.length?'<div class="empty">No loaded posts match your filters. Clear them or load more.</div>':$("#list").innerHTML);
   $("#status").textContent=S.posts.length?`Showing ${vis.length} of ${S.posts.length} loaded posts`:"";
   $("#more").hidden=!S.after;
@@ -224,20 +236,20 @@ function remember(s){
 }
 function chips(){$("#chips").innerHTML=store.get("recent",[]).map(x=>`<button data-s="${esc(x)}">r/${esc(x)}</button>`).join("")}
 
+const FIELDS="id,subreddit,author,title,selftext,score,num_comments,created_utc,permalink,url,domain,thumbnail,preview,link_flair_text,over_18,spoiler,stickied,is_self,is_gallery,gallery_data,media_metadata,post_hint,is_video,upvote_ratio";
 async function load(reset){
   if(S.busy||!S.sub)return;
   S.busy=true;
   const more=$("#more");more.disabled=true;more.textContent="Loading…";
   if(reset){S.posts=[];S.after=null;$("#list").innerHTML='<div class="empty">Loading posts…</div>';$("#status").textContent="";more.hidden=true}
   try{
-    const sort=$("#sort").value;
-    let u=`https://www.reddit.com/r/${S.sub}/${sort}.json?limit=50&raw_json=1`;
-    if(sort==="top")u+="&t="+$("#t").value;
-    if(S.after)u+="&after="+encodeURIComponent(S.after);
-    const j=await rj(u);
-    S.posts=S.posts.concat(j.data.children.filter(c=>c.kind==="t3").map(c=>c.data));
-    S.after=j.data.after;
-    if(!S.posts.length){$("#list").innerHTML='<div class="empty">No posts found in r/'+esc(S.sub)+'.</div>'}
+    let u=`https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=${S.sub}&sort=desc&limit=50&fields=${FIELDS}`;
+    if(S.after)u+="&before="+encodeURIComponent(S.after);
+    const j=await rj(u),a=(j.data||j).map(x=>x.data||x),seen=new Set(S.posts.map(x=>x.id)),n=a.filter(x=>!seen.has(x.id));
+    S.posts=S.posts.concat(n);
+    const last=a[a.length-1];
+    S.after=n.length&&last?new Date(last.created_utc*1000).toISOString().replace(/\.\d+Z$/,"Z"):null;
+    if(!S.posts.length){$("#list").innerHTML='<div class="empty">No posts found in r/'+esc(S.sub)+'. It may not be in the archive.</div>'}
     else{remember(S.sub);setFlairs();render()}
   }catch(e){
     if(!S.posts.length)$("#list").innerHTML=`<div class="empty err">${esc(e.message)}</div>`;
@@ -245,14 +257,14 @@ async function load(reset){
   }finally{S.busy=false;more.disabled=false;more.textContent="Load more";more.hidden=!S.after}
 }
 function setSub(v){
-  const s=String(v).trim().replace(/^\/?r\//i,"").replace(/[^\w+]/g,"");
+  const s=String(v).trim().replace(/^\/?r\//i,"").replace(/[^\w]/g,"");
   if(!s)return;
   $("#sub").value=s;S.sub=s;store.set("sub",s);$("#sub").blur();load(true);
 }
 
 /* ---------- Post view ---------- */
 function media(p){
-  const t=ptype(p),pv=prev(p),im=s=>`<img src="${esc(s)}" loading="lazy" referrerpolicy="no-referrer" alt="">`;
+  const t=ptype(p),pv=prev(p),im=s=>`<img src="${esc(dec(s))}" loading="lazy" referrerpolicy="no-referrer" alt="">`;
   if(t==="gallery"&&p.gallery_data&&p.media_metadata)
     return p.gallery_data.items.slice(0,15).map(i=>{const m=p.media_metadata[i.media_id],s=m&&m.s&&(m.s.u||m.s.gif);return s?im(s):""}).join("");
   if(t==="image")return im(pv||p.url);
@@ -260,12 +272,12 @@ function media(p){
   return pv?im(pv):"";
 }
 function postHTML(p){
-  const url=p.url_overridden_by_dest||p.url||"",ext=!p.is_self&&!p.is_gallery&&/^https?:/.test(url);
+  const url=dec(p.url_overridden_by_dest||p.url||""),ext=!p.is_self&&!p.is_gallery&&/^https?:/.test(url);
   return `<div class="meta"><span class="s">r/${esc(p.subreddit)}</span><span>u/${esc(p.author)}</span><span>${ago(p.created_utc)}</span></div>
-  <h2>${esc(p.title)}</h2><div>${tags(p)}</div>${media(p)}
-  ${p.selftext_html?`<div class="md">${clean(p.selftext_html)}</div>`:""}
+  <h2>${esc(dec(p.title))}</h2><div>${tags(p)}</div>${media(p)}
+  ${p.selftext||p.selftext_html?`<div class="md">${p.selftext_html?clean(p.selftext_html):md(p.selftext)}</div>`:""}
   ${ext?`<a class="lnk" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Open ${esc(p.domain||"link")}</a>`:""}
-  <div class="stats">▲ ${num(p.score)} &nbsp; ${num(p.num_comments)} comments &nbsp; ${Math.round((p.upvote_ratio||0)*100)}% upvoted</div>
+  <div class="stats">▲ ${num(p.score)} &nbsp; ${num(p.num_comments)} comments ${p.upvote_ratio?`&nbsp; ${Math.round(p.upvote_ratio*100)}% upvoted`:""}</div>
   <a class="open" href="https://www.reddit.com${esc(p.permalink)}" target="_blank" rel="noopener">View on Reddit</a>`;
 }
 function openPost(p){
@@ -274,28 +286,38 @@ function openPost(p){
   location.hash="post";loadComments();
 }
 function closePost(){$("#post").hidden=true;document.body.classList.remove("lock")}
+const norm=a=>(a||[]).map(c=>c&&c.kind?c:{kind:"t1",data:c});
+const kidsOf=r=>Array.isArray(r)?r:(r&&r.data&&r.data.children)||[];
+function ord(a){
+  const o=$("#cs").value,t=norm(a),c1=t.filter(c=>c.kind==="t1");
+  c1.sort((p,q)=>o==="new"?q.data.created_utc-p.data.created_utc:o==="old"?p.data.created_utc-q.data.created_utc:q.data.score-p.data.score);
+  return c1.concat(t.filter(c=>c.kind!=="t1"));
+}
 function cm(c,d){
-  if(c.kind!=="t1"){const n=c.data&&c.data.count;return n?`<div class="more">${n} more ${n>1?"replies":"reply"} on Reddit</div>`:""}
-  const x=c.data,kids=x.replies&&x.replies.data?x.replies.data.children.map(k=>cm(k,d+1)).join(""):"";
-  return `<div class="cm" style="--c:var(--r${d%6})"><div class="cmh"><b>${esc(x.author)}</b>${x.is_submitter?'<span class="op">OP</span>':""}<span>▲ ${num(x.score)}</span><span>${ago(x.created_utc)}</span></div>
-  <div class="cb"><div class="md">${clean(x.body_html)}</div></div>${kids?`<div class="kids${d>=5?" deep":""}">${kids}</div>`:""}</div>`;
+  if(c.kind!=="t1"){const n=c.data&&(c.data.count||(c.data.children&&c.data.children.length));return n?`<div class="more">${n} more ${n>1?"replies":"reply"} not loaded</div>`:""}
+  const x=c.data,rep=ord(kidsOf(x.replies||x.children)).map(k=>cm(k,d+1)).join(""),op=cur&&x.author&&x.author===cur.author&&x.author!=="[deleted]";
+  return `<div class="cm" style="--c:var(--r${d%6})"><div class="cmh"><b>${esc(x.author)}</b>${op?'<span class="op">OP</span>':""}<span>▲ ${num(x.score||0)}</span><span>${ago(x.created_utc)}</span></div>
+  <div class="cb"><div class="md">${x.body_html?clean(x.body_html):md(x.body)}</div></div>${rep?`<div class="kids${d>=5?" deep":""}">${rep}</div>`:""}</div>`;
+}
+function renderComments(){
+  if(!cur||!cur._c)return;
+  const k=ord(cur._c);
+  $("#cm").innerHTML=k.length?k.map(c=>cm(c,0)).join(""):'<div class="empty">No comments in the archive for this post.</div>';
 }
 async function loadComments(){
   const p=cur,box=$("#cm");
   box.innerHTML='<div class="empty">Loading comments…</div>';
   try{
-    const j=await rj(`https://www.reddit.com/r/${p.subreddit}/comments/${p.id}.json?raw_json=1&limit=300&sort=${$("#cs").value}`);
+    const j=await rj(`https://arctic-shift.photon-reddit.com/api/comments/tree?link_id=t3_${p.id}&limit=500`);
     if(cur!==p)return;
-    const k=j[1].data.children;
-    box.innerHTML=k.length?k.map(c=>cm(c,0)).join(""):'<div class="empty">No comments yet.</div>';
+    p._c=j.data||j;renderComments();
   }catch(e){if(cur===p)box.innerHTML=`<div class="empty err">${esc(e.message)}</div>`}
 }
 
 /* ---------- Wiring ---------- */
 $("#go").onsubmit=e=>{e.preventDefault();setSub($("#sub").value)};
 document.addEventListener("click",e=>{const b=e.target.closest("[data-s]");if(b)setSub(b.dataset.s)});
-$("#sort").onchange=()=>{$("#t").hidden=$("#sort").value!=="top";store.set("sort",$("#sort").value);load(true)};
-$("#t").onchange=()=>load(true);
+$("#sort").onchange=()=>{store.set("sort",$("#sort").value);render()};
 $("#ref").onclick=()=>load(true);
 $("#more").onclick=()=>load(false);
 $("#ft").onclick=()=>{const f=$("#f");f.hidden=!f.hidden;$("#ft").setAttribute("aria-expanded",!f.hidden)};
@@ -304,7 +326,7 @@ $("#rs").onclick=()=>{$("#q").value="";$("#fl").value="";$("#ty").value="";$("#m
 $("#list").onclick=e=>{const c=e.target.closest(".card");if(c)openPost(S.posts[+c.dataset.i])};
 $("#list").onkeydown=e=>{if(e.key==="Enter"){const c=e.target.closest(".card");if(c)openPost(S.posts[+c.dataset.i])}};
 $("#back").onclick=()=>history.back();
-$("#cs").onchange=loadComments;
+$("#cs").onchange=renderComments;
 $("#cm").onclick=e=>{
   const sp=e.target.closest(".md-spoiler-text");if(sp){sp.classList.toggle("on");return}
   const h=e.target.closest(".cmh");if(h)h.parentNode.classList.toggle("col");
@@ -314,7 +336,7 @@ addEventListener("hashchange",()=>{if(location.hash!=="#post")closePost()});
 
 /* ---------- Start ---------- */
 history.replaceState(null,"",location.pathname+location.search);
-$("#sort").value=store.get("sort","new");$("#t").hidden=$("#sort").value!=="top";
+$("#sort").value=store.get("sort","new");if(!$("#sort").value)$("#sort").value="new";
 chips();
 const last=store.get("sub","");
 if(last){$("#sub").value=last;S.sub=last;load(true)}else welcome();
