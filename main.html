@@ -152,7 +152,7 @@ async function rj(url){
   let r;
   try{r=await fetch(url)}catch(e){throw new Error("Couldn’t reach the Reddit archive. Check your connection and try again.")}
   if(r.status===429)throw new Error("The archive is rate-limiting requests. Wait a minute, then refresh.");
-  if(!r.ok)throw new Error("The archive returned an error ("+r.status+"). Try again shortly.");
+  if(!r.ok){let t="";try{t=(await r.text()).replace(/<[^>]*>/g," ").trim().slice(0,160)}catch(e){}throw new Error("The archive returned an error ("+r.status+")."+(t?" "+t:""))}
   try{return await r.json()}catch(e){throw new Error("The archive sent an unexpected response. Try again.")}
 }
 
@@ -236,14 +236,13 @@ function remember(s){
 }
 function chips(){$("#chips").innerHTML=store.get("recent",[]).map(x=>`<button data-s="${esc(x)}">r/${esc(x)}</button>`).join("")}
 
-const FIELDS="id,subreddit,author,title,selftext,score,num_comments,created_utc,permalink,url,domain,thumbnail,preview,link_flair_text,over_18,spoiler,stickied,is_self,is_gallery,gallery_data,media_metadata,post_hint,is_video,upvote_ratio";
 async function load(reset){
   if(S.busy||!S.sub)return;
   S.busy=true;
   const more=$("#more");more.disabled=true;more.textContent="Loading…";
   if(reset){S.posts=[];S.after=null;$("#list").innerHTML='<div class="empty">Loading posts…</div>';$("#status").textContent="";more.hidden=true}
   try{
-    let u=`https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=${S.sub}&sort=desc&limit=50&fields=${FIELDS}`;
+    let u=`https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=${S.sub}&sort=desc&limit=50`;
     if(S.after)u+="&before="+encodeURIComponent(S.after);
     const j=await rj(u),a=(j.data||j).map(x=>x.data||x),seen=new Set(S.posts.map(x=>x.id)),n=a.filter(x=>!seen.has(x.id));
     S.posts=S.posts.concat(n);
